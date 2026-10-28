@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account Hub</title>
+<style>
+:root{color-scheme:dark;--bg:#0a1020;--panel:#111a2e;--line:#243353;--ink:#e8eefc;--mut:#93a1bd;--acc:#ff8a1f;--err:#ff7b7b;--ok:#3ddc97}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+h1{font-size:1.3rem;margin:0}
+h2{font-size:1.05rem;margin:0 0 12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+label{display:block;font-size:.9rem;color:var(--mut);margin:12px 0 4px}
+input{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+input:focus-visible,button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center}
+button{font:inherit;font-weight:600;border-radius:9px;padding:10px 16px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink)}
+button.go{background:var(--acc);border-color:var(--acc);color:#1b0f00}
+.mt{margin-top:16px}
+.msg{min-height:1.4em;margin-top:12px;font-size:.92rem;color:var(--err)}
+.msg.ok{color:var(--ok)}
+.stats{color:var(--mut);font-size:.92rem;margin:-6px 0 16px}
+a.sw{color:var(--acc);cursor:pointer;text-decoration:underline;background:none;border:0;padding:0;font-weight:400}
+</style>
+</head>
+<body>
+<main>
+  <header><h1 id="title">Account Hub</h1><button id="out" hidden>Log out</button></header>
+
+  <!-- Login / Register -->
+  <section id="auth" hidden>
+    <form id="loginForm" class="card">
+      <h2>Log in</h2>
+      <label for="lu">Username</label><input id="lu" autocomplete="username" required>
+      <label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required>
+      <button class="go mt">Log in</button>
+      <p>No account yet? <button type="button" class="sw" data-go="reg">Register</button></p>
+    </form>
+    <form id="regForm" class="card" hidden>
+      <h2>Register</h2>
+      <label for="rn">Your name</label><input id="rn" required>
+      <label for="ru">Username</label><input id="ru" autocomplete="username" required>
+      <label for="rp">Password (6 or more characters)</label><input id="rp" type="password" autocomplete="new-password" required>
+      <label for="rc">Invite code (only if you were given one)</label><input id="rc">
+      <button class="go mt">Register</button>
+      <p>You can log in after the admin approves you. <button type="button" class="sw" data-go="login">Back to log in</button></p>
+    </form>
+    <div id="authMsg" class="msg"></div>
+  </section>
+
+  <!-- Work area -->
+  <section id="app" hidden>
+    <h2 id="hi"></h2>
+    <p class="stats" id="st"></p>
+
+    <div class="card">
+      <h2>Create this account</h2>
+      <div id="none" hidden>No names are available right now. Ask the admin to add more.</div>
+      <div id="pair">
+        <label for="pn">Name</label>
+        <div class="row"><input id="pn" readonly><button data-copy="pn">Copy</button></div>
+        <label for="pp">Password</label>
+        <div class="row"><input id="pp" type="password" readonly><button id="eye">Show</button><button data-copy="pp">Copy</button></div>
+      </div>
+      <button id="reload" class="mt">Get another name</button>
+    </div>
+
+    <form id="subForm" class="card">
+      <h2>Submit the result</h2>
+      <label for="uid">UID (required)</label><input id="uid" required>
+      <label for="tf">2FA (optional)</label><input id="tf">
+      <button class="go mt">Submit</button>
+    </form>
+    <div id="appMsg" class="msg"></div>
+  </section>
+</main>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbxvZGn8LV0XMQlH_IZRm9ucxbH8828lQ9MSsVINFEM9QV-4i5Ba3uvjTqpzZRX0jBnm/exec";
+const APP_NAME = "Account Hub";
+const $ = (id) => document.getElementById(id);
+let token = "";
+try { token = localStorage.getItem("ah_token") || ""; } catch (e) {}
+$("title").textContent = APP_NAME; document.title = APP_NAME;
+
+async function call(action, data) {
+  if (API_URL.startsWith("PASTE")) return { ok: false, error: "Set API_URL in index.html first." };
+  try {
+    // No headers on purpose: keeps the request "simple" so the browser does not block it (CORS).
+    const r = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action, token, ...data }) });
+    return await r.json();
+  } catch (e) { return { ok: false, error: "Could not reach the server. Check your internet." }; }
+}
+const msg = (id, t, good) => { const el = $(id); el.textContent = t || ""; el.className = "msg" + (good ? " ok" : ""); };
+function view(v) { $("auth").hidden = v !== "auth"; $("app").hidden = v !== "app"; $("out").hidden = v !== "app"; }
+function toLogin(t) { token = ""; try { localStorage.removeItem("ah_token"); } catch (e) {} view("auth"); msg("authMsg", t || ""); }
+
+document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => {
+  $("loginForm").hidden = b.dataset.go !== "login"; $("regForm").hidden = b.dataset.go !== "reg"; msg("authMsg", "");
+});
+
+$("loginForm").onsubmit = async (e) => {
+  e.preventDefault(); msg("authMsg", "Logging in...", true);
+  const r = await call("login", { username: $("lu").value, password: $("lp").value });
+  if (!r.ok) return msg("authMsg", r.error);
+  token = r.token; try { localStorage.setItem("ah_token", token); } catch (x) {}
+  $("lp").value = ""; load();
+};
+
+$("regForm").onsubmit = async (e) => {
+  e.preventDefault(); msg("authMsg", "Registering...", true);
+  const r = await call("register", { name: $("rn").value, username: $("ru").value, password: $("rp").value, code: $("rc").value });
+  if (!r.ok) return msg("authMsg", r.error);
+  $("regForm").reset(); $("regForm").hidden = true; $("loginForm").hidden = false;
+  msg("authMsg", "Registered. Wait for the admin to approve you, then log in.", true);
+};
+
+function render(r) {
+  $("hi").textContent = "Welcome, " + r.name;
+  $("st").textContent = "Submitted today: " + r.stats.today + "  |  Total: " + r.stats.total + "  |  Names left: " + r.stats.free;
+  $("pair").hidden = !r.pair; $("none").hidden = !!r.pair;
+  if (r.pair) { $("pn").value = r.pair.name; $("pp").value = r.pair.password; $("pp").type = "password"; $("eye").textContent = "Show"; }
+}
+
+async function load() {
+  view("app"); msg("appMsg", "Loading...", true);
+  const r = await call("state");
+  if (!r.ok) return r.auth === false ? toLogin(r.error) : msg("appMsg", r.error);
+  render(r); msg("appMsg", "");
+}
+
+$("subForm").onsubmit = async (e) => {
+  e.preventDefault(); msg("appMsg", "Saving...", true);
+  const r = await call("submit", { uid: $("uid").value, twofa: $("tf").value });
+  if (!r.ok) return r.auth === false ? toLogin(r.error) : msg("appMsg", r.error);
+  $("subForm").reset(); render(r); msg("appMsg", "Saved. Here is your next name.", true);
+};
+
+$("reload").onclick = async () => {
+  if (!confirm("Get another name? The current one goes back to the list.")) return;
+  const r = await call("reload");
+  if (!r.ok) return r.auth === false ? toLogin(r.error) : msg("appMsg", r.error);
+  render(r); msg("appMsg", r.note || "New name ready.", !r.note);
+};
+
+$("eye").onclick = () => { const p = $("pp"), s = p.type === "password"; p.type = s ? "text" : "password"; $("eye").textContent = s ? "Hide" : "Show"; };
+document.querySelectorAll("[data-copy]").forEach((b) => b.onclick = async () => {
+  try { await navigator.clipboard.writeText($(b.dataset.copy).value); msg("appMsg", "Copied.", true); }
+  catch (e) { msg("appMsg", "Copy failed. Select the text and copy it by hand."); }
+});
+$("out").onclick = async () => { await call("logout"); toLogin("You are logged out."); };
+
+token ? load() : view("auth");
+</script>
+</body>
+</html>
