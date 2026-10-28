@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arman FB Work</title>
+<title>Arman Account Hub</title>
 <style>
 :root{color-scheme:dark;--bg:#0a1020;--panel:#111a2e;--line:#243353;--ink:#e8eefc;--mut:#93a1bd;--acc:#ff8a1f;--err:#ff7b7b;--ok:#3ddc97}
 *{box-sizing:border-box}
@@ -29,7 +29,7 @@ a.sw{color:var(--acc);cursor:pointer;text-decoration:underline;background:none;b
 </head>
 <body>
 <main>
-  <header><h1 id="title">Account Hub</h1><button id="out" hidden>Log out</button></header>
+  <header><h1 id="title">Arman Hub</h1><button id="out" hidden>Log out</button></header>
 
   <!-- Login / Register -->
   <section id="auth" hidden>
@@ -63,14 +63,18 @@ a.sw{color:var(--acc);cursor:pointer;text-decoration:underline;background:none;b
       <div id="pair">
         <label for="pn">Name</label>
         <div class="row"><input id="pn" readonly><button data-copy="pn">Copy</button></div>
+        <div id="gnRow" hidden><label for="pg">Gender</label><input id="pg" readonly></div>
         <label for="pp">Password</label>
         <div class="row"><input id="pp" type="password" readonly><button id="eye">Show</button><button data-copy="pp">Copy</button></div>
+        <div id="emRow" hidden><label for="pe">Email</label>
+        <div class="row"><input id="pe" readonly><button data-copy="pe">Copy</button></div></div>
       </div>
       <button id="reload" class="mt">Get another name</button>
     </div>
 
     <form id="subForm" class="card">
       <h2>Submit the result</h2>
+      <div id="emIn" hidden><label for="em">Email you used for this account (required)</label><input id="em" type="email"></div>
       <label for="uid">UID (required)</label><input id="uid" required>
       <label for="tf">2FA (optional)</label><input id="tf">
       <button class="go mt">Submit</button>
@@ -80,7 +84,7 @@ a.sw{color:var(--acc);cursor:pointer;text-decoration:underline;background:none;b
 </main>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbxvZGn8LV0XMQlH_IZRm9ucxbH8828lQ9MSsVINFEM9QV-4i5Ba3uvjTqpzZRX0jBnm/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxvZGn8LV0XMQlH_IZRm9ucxbH8828lQ9MSsVINFEM9QV-4i5Ba3uvjTqpzZRX0jBnm/exec";   // from Apps Script: Deploy > Web app URL
 const APP_NAME = "Account Hub";
 const $ = (id) => document.getElementById(id);
 let token = "";
@@ -123,7 +127,10 @@ function render(r) {
   $("hi").textContent = "Welcome, " + r.name;
   $("st").textContent = "Submitted today: " + r.stats.today + "  |  Total: " + r.stats.total + "  |  Names left: " + r.stats.free;
   $("pair").hidden = !r.pair; $("none").hidden = !!r.pair;
-  if (r.pair) { $("pn").value = r.pair.name; $("pp").value = r.pair.password; $("pp").type = "password"; $("eye").textContent = "Show"; }
+  const hasEm = !!(r.pair && r.pair.email);
+  $("emRow").hidden = !hasEm; $("emIn").hidden = !r.pair || hasEm; $("em").required = !!r.pair && !hasEm;
+  $("gnRow").hidden = !(r.pair && r.pair.gender);
+  if (r.pair) { $("pg").value = r.pair.gender || ""; $("pe").value = r.pair.email || ""; $("pn").value = r.pair.name; $("pp").value = r.pair.password; $("pp").type = "password"; $("eye").textContent = "Show"; }
 }
 
 async function load() {
@@ -135,7 +142,7 @@ async function load() {
 
 $("subForm").onsubmit = async (e) => {
   e.preventDefault(); msg("appMsg", "Saving...", true);
-  const r = await call("submit", { uid: $("uid").value, twofa: $("tf").value });
+  const r = await call("submit", { uid: $("uid").value, twofa: $("tf").value, email: $("em").value });
   if (!r.ok) return r.auth === false ? toLogin(r.error) : msg("appMsg", r.error);
   $("subForm").reset(); render(r); msg("appMsg", "Saved. Here is your next name.", true);
 };
